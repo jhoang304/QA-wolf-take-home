@@ -21,7 +21,7 @@ async function saveHackerNewsArticles() {
     // Select the first 10 'tr.athing' elements
     const rows = Array.from(document.querySelectorAll('tr.athing')).slice(0, 10);
     return rows.map(row => {
-      // Within each 'tr', the title is in 'a.titlelink'
+      // Within each 'tr', the title is in 'span.titleline a'
       const titleElement = row.querySelector('span.titleline a');
       const title = titleElement ? titleElement.innerText : 'No Title';
       const url = titleElement ? titleElement.href : 'No URL';
@@ -43,9 +43,17 @@ async function saveHackerNewsArticles() {
 }
 
 async function saveArticlesToCSV(articles) {
-  const header = 'Title,URL\n';
+  const header = 'Title, URL\n';
   const csvContent = articles
-    .map(article => `"${article.title.replace(/"/g, '""')}", "${article.url}"`)
+    .map((article, index) => {
+      // Concatenate the rank with a period, a space, and the title, escaping quotes in the title.
+      // The entire string is enclosed in quotes to ensure it's seen as one CSV field.
+      const titleWithRank = `"${index + 1}. ${article.title.replace(/"/g, '""')}"`;
+      // Enclose the URL in quotes.
+      const url = `"${article.url}"`;
+      // Return the concatenated string without a comma after the rank.
+      return `${titleWithRank}, ${url}`;
+    })
     .join('\n');
   await fs.outputFile('articles.csv', header + csvContent);
 }
