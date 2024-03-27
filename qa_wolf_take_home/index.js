@@ -47,13 +47,7 @@ async function saveHackerNewsArticles() {
     return extractedArticles;
   });
 
-  // Checking to make sure there are articles in the array before saving to CSV.
-  if (articles.length) {
-    await saveArticlesToCSV(articles);
-    console.log(`${articles.length} articles saved to CSV.`);
-  } else {
-    console.log('No articles were captured.');
-  }
+  await saveArticlesToCSV(articles);
 
   await browser.close();
 }
@@ -68,8 +62,18 @@ async function saveArticlesToCSV(articles) {
       return `"${title.replace(/"/g, '""')}","${url}"`;
     })
     .join('\n');
-  // Creates a new file named 'articles.csv' with the header and content.
-  await fs.outputFile('articles.csv', header + csvContent);
+  // Checking to make sure there are articles in the array before saving to CSV.
+  try {
+    if (csvContent) {
+      console.log(`${articles.length} articles saved to CSV.`);
+      // Creates a new file named 'articles.csv' with the header and content.
+      await fs.outputFile('articles.csv', header + csvContent);
+    } else {
+      console.log('No articles were captured.');
+    }
+  } catch (error) {
+    console.log('Error saving articles to CSV:', error.message);
+  }
 }
 // ========================MY CODE=================================================================================================================
 
