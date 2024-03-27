@@ -8,33 +8,49 @@ async function saveHackerNewsArticles() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  // go to Hacker News
-  await page.goto('https://news.ycombinator.com');
 
-  // Adding a delay to ensure all elements are loaded in order
-  await page.waitForTimeout(5000);
 
-  // Make sure to wait for the '.athing' elements to be loaded.
-  await page.waitForSelector('span.titleline a');
+  // ========================MY CODE=================================================================================================================
+  // Add a try/catch block to handle any errors that occur when launching the browser.
+  try {
+    // go to Hacker News
+    await page.goto('https://news.ycombinator.com');
+  } catch (error) {
+    await browser.close();
+    console.log('Error launching browser:', error.message);
+    return;
+  }
+
+  // Make sure to wait for the 'tr.athing' elements to be loaded.
+  await page.waitForSelector('tr.athing');
 
   const articles = await page.evaluate(() => {
-    // Select the first 10 'tr.athing' elements
-    const rows = Array.from(document.querySelectorAll('tr.athing')).slice(0, 10);
-    return rows.map(row => {
-      // Within each 'tr', the title is in 'span.titleline a'
+    const extractedArticles = [];
+    const rows = Array.from(document.querySelectorAll('tr.athing'));
+    for (let row of rows) {
+      // Extract the title and URL from each row.
       const titleElement = row.querySelector('span.titleline a');
-      const title = titleElement ? titleElement.innerText : 'No Title';
-      const url = titleElement ? titleElement.href : 'No URL';
-      return { title, url };
-    });
+      const title = titleElement?.innerText ?? 'No Title';
+      const url = titleElement?.href ?? 'No URL';
+      // If the title and URL are not 'No Title' and 'No URL', add them to the array.
+      if (title !== 'No Title' && url !== 'No URL') {
+        extractedArticles.push({
+          title,
+          url
+        });
+      }
+      // Only save the first 10 articles.
+      if (extractedArticles.length >= 10) {
+        break;
+      }
+    }
+    return extractedArticles;
   });
 
-  // Log articles for debugging
-  console.log(articles);
-
-  if (articles.length > 0) {
+  // Checking to make sure there are articles in the array before saving to CSV.
+  if (articles.length) {
     await saveArticlesToCSV(articles);
-    console.log('Articles saved to CSV.');
+    console.log(`${articles.length} articles saved to CSV.`);
   } else {
     console.log('No articles were captured.');
   }
@@ -42,21 +58,20 @@ async function saveHackerNewsArticles() {
   await browser.close();
 }
 
+// Function to save the articles to a CSV file.
 async function saveArticlesToCSV(articles) {
-  const header = 'Title, URL\n';
+  const header = 'Title,URL\n';
   const csvContent = articles
-    .map((article, index) => {
-      // Concatenate the rank with a period, a space, and the title, escaping quotes in the title.
+    .map(article => {
+      let { title, url } = article;
       // The entire string is enclosed in quotes to ensure it's seen as one CSV field.
-      const titleWithRank = `"${index + 1}. ${article.title.replace(/"/g, '""')}"`;
-      // Enclose the URL in quotes.
-      const url = `"${article.url}"`;
-      // Return the concatenated string without a comma after the rank.
-      return `${titleWithRank}, ${url}`;
+      return `"${title.replace(/"/g, '""')}","${url}"`;
     })
     .join('\n');
+  // Creates a new file named 'articles.csv' with the header and content.
   await fs.outputFile('articles.csv', header + csvContent);
 }
+// ========================MY CODE=================================================================================================================
 
 (async () => {
   await saveHackerNewsArticles();
