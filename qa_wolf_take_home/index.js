@@ -8,8 +8,6 @@ async function saveHackerNewsArticles() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-
-
   // ========================MY CODE=================================================================================================================
   // Add a try/catch block to handle any errors that occur when launching the browser.
   try {
