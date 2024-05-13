@@ -8,46 +8,51 @@ async function saveHackerNewsArticles() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  // ========================MY CODE=================================================================================================================
-  // Add a try/catch block to handle any errors that occur when launching the browser.
   try {
     // go to Hacker News
-    await page.goto('https://news.ycombinator.com');
+    await page.goto('https://news.ycombinator.com/');
   } catch (error) {
     await browser.close();
-    console.log('Error launching browser:', error.message);
-    return;
+    // console.log('Error launching browser:', error.message);
+    throw new Error('Error launching browser:', error.message);
   }
 
-  // Make sure to wait for the 'tr.athing' elements to be loaded.
-  await page.waitForSelector('tr.athing');
 
-  const articles = await page.evaluate(() => {
-    const extractedArticles = [];
-    const rows = Array.from(document.querySelectorAll('tr.athing'));
-    for (let row of rows) {
-      // Extract the title and URL from each row.
-      const titleElement = row.querySelector('span.titleline a');
-      const title = titleElement?.innerText ?? 'No Title';
-      const url = titleElement?.href ?? 'No URL';
-      // If the title and URL are not 'No Title' and 'No URL', add them to the array.
-      if (title !== 'No Title' && url !== 'No URL') {
-        extractedArticles.push({
-          title,
-          url
-        });
+  try {
+    // Wait for articles to load.
+    await page.waitForSelector('tr.athing', { timeout: 5000});
+    
+    const articles = retrieveArticles(page);
+    await saveArticlesToCSV(articles);
+  } catch (error) {
+    console.log('Error during page evaluation or CSV saving:', error.message);
+  } finally {
+    await browser.close();
+}
+
+async function retrieveArticles() {
+    const articles = await page.evaluate(() => {
+      const extractedArticles = [];
+      const rows = Array.from(document.querySelectorAll('tr.athing'));
+      for (let row of rows) {
+        // Extract the title and URL from each row.
+        const titleElement = row.querySelector('span.titleline a');
+        const title = titleElement?.innerText ?? 'No Title';
+        const url = titleElement?.href ?? 'No URL';
+        // If the title and URL are not 'No Title' and 'No URL', add them to the array.
+        if (title !== 'No Title' && url !== 'No URL') {
+          extractedArticles.push({
+            title,
+            url
+          });
+        }
+        // Only save the first 10 articles.
+        if (extractedArticles.length >= 10) {
+          break;
+        }
       }
-      // Only save the first 10 articles.
-      if (extractedArticles.length >= 10) {
-        break;
-      }
-    }
-    return extractedArticles;
-  });
-
-  await saveArticlesToCSV(articles);
-
-  await browser.close();
+      return extractedArticles;
+    });
 }
 
 // Function to save the articles to a CSV file.
@@ -78,3 +83,5 @@ async function saveArticlesToCSV(articles) {
 (async () => {
   await saveHackerNewsArticles();
 })();
+
+module.exports = { saveHackerNewsArticles };
