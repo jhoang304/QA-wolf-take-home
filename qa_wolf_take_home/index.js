@@ -1,51 +1,77 @@
 // EDIT THIS FILE TO COMPLETE ASSIGNMENT QUESTION 1
 const { chromium } = require("playwright");
-const fs = require('fs-extra'); // for file system operations
+const fs = require('fs-extra');
 
 async function saveHackerNewsArticles() {
-  // launch browser
+  let articles = [];
+  const url = 'https://news.ycombinator.com/';
+
+  // Launch browser
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
   const page = await context.newPage();
 
+  // Go to Hacker News
   try {
-    // go to Hacker News
-    await page.goto('https://news.ycombinator.com/');
+    await page.goto(url);
   } catch (error) {
+    console.log('Error launching browser:', error.message);
     await browser.close();
-    // console.log('Error launching browser:', error.message);
-    throw new Error('Error launching browser:', error.message);
+    return;
   }
 
-
+  // Wait for articles to load
   try {
-    // Wait for articles to load.
-    await page.waitForSelector('tr.athing', { timeout: 5000});
-    
-    const articles = retrieveArticles(page);
+    await page.waitForSelector('tr.athing', { timeout: 5000 });
+  } catch (error) {
+    console.log("Error while waiting for articles to load: ", error.message);
+    await browser.close();
+    return;
+  }
+
+  // Retrieve top 10 articles
+  try {
+    articles = await retrieveArticles(page);
+  } catch (error) {
+    console.log('Error during page evaluation:', error.message);
+    await browser.close();
+    return;
+  }
+
+  // Save articles to CSV
+  try {
     await saveArticlesToCSV(articles);
   } catch (error) {
-    console.log('Error during page evaluation or CSV saving:', error.message);
-  } finally {
+    console.log('Error saving articles to CSV: ', error.message);
     await browser.close();
+    return;
+  }
+
+  await browser.close();
+  return articles;
 }
 
-async function retrieveArticles() {
-    const articles = await page.evaluate(() => {
+
+/*
+  Function to retrieve the top 10 articles from the Hacker News page.
+  Parameters:
+    page: The Playwright page object to evaluate.
+  Returns: An array of objects, each containing the title and URL of an article.
+*/
+async function retrieveArticles(page) {
+    return await page.evaluate(() => {
       const extractedArticles = [];
       const rows = Array.from(document.querySelectorAll('tr.athing'));
+      // Extract the title and URL from each row.
       for (let row of rows) {
-        // Extract the title and URL from each row.
         const titleElement = row.querySelector('span.titleline a');
-        const title = titleElement?.innerText ?? 'No Title';
-        const url = titleElement?.href ?? 'No URL';
-        // If the title and URL are not 'No Title' and 'No URL', add them to the array.
-        if (title !== 'No Title' && url !== 'No URL') {
-          extractedArticles.push({
-            title,
-            url
-          });
-        }
+        const title = titleElement?.innerText ?? undefined;
+        const url = titleElement?.href ?? undefined;
+        extractedArticles.push({
+          title,
+          url
+        });
+
         // Only save the first 10 articles.
         if (extractedArticles.length >= 10) {
           break;
@@ -55,22 +81,28 @@ async function retrieveArticles() {
     });
 }
 
-// Function to save the articles to a CSV file.
+/*
+  Function to save the articles to a CSV file.
+  Parameters:
+    articles: An array of objects, each containing the title and URL of an article.
+  Returns: None
+*/
 async function saveArticlesToCSV(articles) {
   const header = 'Title,URL\n';
+  // The entire string is enclosed in quotes to ensure it's seen as one CSV field.
+  const format = (title, url) => `"${title.replace(/"/g, '""')}","${url}"`;
   const csvContent = articles
     .map(article => {
       let { title, url } = article;
-      // The entire string is enclosed in quotes to ensure it's seen as one CSV field.
-      return `"${title.replace(/"/g, '""')}","${url}"`;
+      return format(title, url);
     })
     .join('\n');
   // Checking to make sure there are articles in the array before saving to CSV.
   try {
     if (csvContent) {
-      console.log(`${articles.length} articles saved to CSV.`);
       // Creates a new file named 'articles.csv' with the header and content.
       await fs.outputFile('articles.csv', header + csvContent);
+      console.log(`${articles.length} articles saved to CSV.`);
     } else {
       console.log('No articles were captured.');
     }
@@ -78,7 +110,7 @@ async function saveArticlesToCSV(articles) {
     console.log('Error saving articles to CSV:', error.message);
   }
 }
-// ========================MY CODE=================================================================================================================
+
 
 (async () => {
   await saveHackerNewsArticles();
